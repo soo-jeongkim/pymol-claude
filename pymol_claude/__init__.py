@@ -6,8 +6,17 @@ from any MCP client (Claude Code, claude.ai, mobile app).
 
 from __future__ import annotations
 
+import sys
 import threading
+from pathlib import Path
 from typing import Optional
+
+# Ensure the pymol_claude package is importable even when loaded as a PyMOL
+# startup plugin from the app bundle. The project root (parent of pymol_claude/)
+# must be on sys.path so that "from pymol_claude.mcp_server import ..." works.
+_project_root = str(Path(__file__).resolve().parent.parent)
+if _project_root not in sys.path:
+    sys.path.insert(0, _project_root)
 
 _server_thread: Optional[threading.Thread] = None
 
@@ -28,6 +37,9 @@ def start_claude(port: int = 8766):
         print("pymol-claude: MCP server is already running")
         return
 
+    import os
+    os.environ["FASTMCP_LOG_LEVEL"] = "WARNING"
+
     from pymol_claude.mcp_server import create_server
 
     server = create_server()
@@ -35,13 +47,12 @@ def start_claude(port: int = 8766):
 
     _server_thread = threading.Thread(
         target=server.run,
-        kwargs={"transport": "sse", "host": "0.0.0.0", "port": port},
+        kwargs={"transport": "sse", "host": "0.0.0.0", "port": port, "log_level": "warning"},
         daemon=True,
     )
     _server_thread.start()
 
     print(f"pymol-claude: MCP server running on http://0.0.0.0:{port}/sse")
-    print(f"pymol-claude: WARNING — server binds 0.0.0.0 (all interfaces)")
 
 
 def stop_claude():

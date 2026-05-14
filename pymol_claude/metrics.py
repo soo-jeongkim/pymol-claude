@@ -176,10 +176,22 @@ def extract_record(path: Path, name: Optional[str] = None) -> StructureRecord:
     n_residues = len(ca_atoms)
 
     # Check B-factor column for pLDDT
+    # biotite 1.2+ doesn't auto-populate b_factor; read from atom_site directly for CIF
     plddt = None
+    b_factors = None
     if n_residues > 0:
-        b_factors = ca_atoms.b_factor
-        if len(b_factors) > 0:
+        if hasattr(ca_atoms, "b_factor"):
+            b_factors = ca_atoms.b_factor
+        elif path.suffix.lower() in (".cif", ".mmcif"):
+            try:
+                atom_site = block["atom_site"]
+                all_b = np.array(atom_site["B_iso_or_equiv"].as_array(), dtype=np.float64)
+                all_atom_names = atom_site["label_atom_id"].as_array()
+                ca_b_mask = np.array([n == "CA" for n in all_atom_names])
+                b_factors = all_b[ca_b_mask]
+            except (KeyError, ValueError):
+                pass
+        if b_factors is not None and len(b_factors) > 0:
             bmin, bmax = float(np.min(b_factors)), float(np.max(b_factors))
             std = float(np.std(b_factors))
             # pLDDT is 0-100 with meaningful variance

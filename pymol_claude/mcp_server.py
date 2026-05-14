@@ -11,7 +11,8 @@ from contextlib import redirect_stdout
 from pathlib import Path
 from typing import Optional
 
-from fastmcp import FastMCP, Image
+from fastmcp import FastMCP
+from fastmcp.utilities.types import Image
 
 _pymol_lock = threading.Lock()
 
@@ -35,7 +36,7 @@ def _ensure_pymol():
     except ImportError:
         raise RuntimeError(
             "PyMOL is not installed. Install it with: "
-            "uv pip install pymol-open-source"
+            "/Applications/PyMOL.app/Contents/bin/python -m pip install -e ."
         )
 
 
