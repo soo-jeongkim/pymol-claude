@@ -4,19 +4,37 @@ PyMOL plugin that exposes PyMOL as an MCP server. Control PyMOL from Claude Code
 
 ## Setup (one time)
 
-### 1. Install dependencies into PyMOL's Python
+### 1. Clone this repo
 
 ```bash
-sudo /Applications/PyMOL.app/Contents/bin/python -m pip install -e ~/Documents/pymol-claude
+git clone <repo-url> pymol-claude
+cd pymol-claude
 ```
 
-### 2. Auto-start the plugin with PyMOL
+### 2. Install into PyMOL's bundled Python
+
+PyMOL ships its own Python; install the plugin into *that* interpreter, not your system Python. On macOS with PyMOL.app:
 
 ```bash
-echo 'import sys; sys.path.insert(0, "/Users/$USER/Documents/pymol-claude"); from pymol_claude import __init_plugin__; __init_plugin__()' > ~/.pymolrc.py
+sudo /Applications/PyMOL.app/Contents/bin/python -m pip install -e .
 ```
 
-### 3. Register the MCP server with Claude Code
+On Linux/conda installs, replace the path with wherever your PyMOL keeps its Python (e.g. `$(which pymol | xargs dirname)/python`).
+
+### 3. Auto-start the plugin with PyMOL
+
+Append a launcher to `~/.pymolrc.py`. Run this from inside the clone — `$(pwd)` is captured into the rc file:
+
+```bash
+cat >> ~/.pymolrc.py <<EOF
+import sys
+sys.path.insert(0, "$(pwd)")
+from pymol_claude import __init_plugin__
+__init_plugin__()
+EOF
+```
+
+### 4. Register the MCP server with Claude Code
 
 ```bash
 claude mcp add --transport sse --scope user pymol http://localhost:8766/sse
@@ -29,7 +47,7 @@ That's it. This works globally — you can run `claude` from any directory.
 1. **Open PyMOL** — the MCP server auto-starts (check console for "MCP server running on...")
 2. **Open Claude Code** in any terminal: `claude`
 3. **Talk to it:**
-   - "Load all the CIF files in ~/Documents/foldspace/foldspace/test"
+   - "Load all the CIF files in <your structure dir>"
    - "Color by pLDDT"
    - "Align model_0 to model_1"
    - "Show sticks for the active site"
@@ -45,7 +63,7 @@ PyMOL must be running first — it's the server, Claude is the client.
 
 **Rendering:** render (ray-traced), snapshot (fast)
 
-**Metrics (biotite):** get_metrics, find_low_confidence, compare_all
+**Metrics (gemmi):** get_metrics, find_low_confidence, compare_all
 
 **Triage:** load_directory, next_structure, prev_structure, go_to, current, flag, show_flags, export_flags, filter
 
