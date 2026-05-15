@@ -25,13 +25,12 @@ def main():
         print("Error: PyMOL is not available. Run this with: pymol -cq -r start_headless.py")
         sys.exit(1)
 
-    from pymol_claude.mcp_server import create_server, _get_triage
+    from pymol_claude.mcp_server import create_server, triage
 
     server = create_server()
 
     # If files were provided, load them into triage
     if args.files:
-        triage = _get_triage()
         # Check if a directory was provided
         paths = [Path(f) for f in args.files]
         if len(paths) == 1 and paths[0].is_dir():

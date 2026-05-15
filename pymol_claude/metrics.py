@@ -1,4 +1,4 @@
-"""Structure metadata extraction using biotite (not PyMOL)."""
+"""Structure metadata extraction using gemmi."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
+import gemmi
 import numpy as np
 
 
@@ -15,13 +16,13 @@ import numpy as np
 class StructureRecord:
     name: str
     path: Path
-    kind: str  # af2_single | af3_complex | crystal | unknown
     chains: list[str]
     n_residues: int
     plddt: Optional[np.ndarray] = field(default=None, repr=False)  # per-residue, 0-100
     pae: Optional[np.ndarray] = field(default=None, repr=False)
     iptm: Optional[float] = None
     ptm: Optional[float] = None
+    ranking_score: Optional[float] = None  # AF3-only top-line score
 
     @property
     def mean_plddt(self) -> Optional[float]:
@@ -42,7 +43,6 @@ class StructureRecord:
         lines = [
             f"Structure: {self.name}",
             f"  File: {self.path.name}",
-            f"  Type: {self.kind}",
             f"  Chains: {', '.join(self.chains)}",
             f"  Residues: {self.n_residues}",
         ]
@@ -61,158 +61,204 @@ class StructureRecord:
                          f">0.8 confident interaction, "
                          f"0.6-0.8 possible, "
                          f"<0.6 unlikely")
+        if self.ranking_score is not None:
+            lines.append(f"  ranking_score: {self.ranking_score:.3f}")
         if self.pae is not None:
-            lines.append(f"  PAE: mean={float(np.mean(self.pae)):.1f} A")
+            lines.append(f"  PAE: mean={float(np.nanmean(self.pae)):.1f} A")
         return "\n".join(lines)
 
 
-def _detect_kind(path: Path) -> str:
-    """Detect structure source from filename markers."""
-    stem = path.stem.lower()
-    markers = {
-        "af3": "af3_complex",
-        "alphafold3": "af3_complex",
-        "af2": "af2_single",
-        "alphafold2": "af2_single",
-        "alphafold": "af2_single",
-        "af_": "af2_single",
-        "colabfold": "af2_single",
-        "ranked_": "af2_single",
-        "fold_": "unknown",
-        "esm": "unknown",
-        "boltz": "unknown",
-        "chai": "unknown",
-        "omegafold": "unknown",
-    }
-    for marker, kind in markers.items():
-        if marker in stem:
-            return kind
-    return "unknown"
+# Map AF3/MA-format `_ma_qa_metric.name` values to StructureRecord field names.
+GLOBAL_METRIC_MAP = {"pTM": "ptm", "ipTM": "iptm", "ranking_score": "ranking_score"}
 
 
-def _find_sibling_json(path: Path) -> dict:
-    """Search for PAE/confidence JSON files alongside the structure."""
+def metrics_from_cif(path: Path) -> dict:
+    """Read PAE and global QA metrics embedded in mmCIF (`_ma_qa_metric_*`)."""
+    if path.suffix.lower() not in (".cif", ".mmcif"):
+        return {}
+
+    try:
+        block = gemmi.cif.read(str(path)).sole_block()
+    except (RuntimeError, ValueError):
+        return {}
+
+    out: dict = {}
+
+    # Build metric_id → (name, type) so we can look up by either field.
+    metric_info = {row[0]: (row[1], row[2])
+                   for row in block.find("_ma_qa_metric.", ["id", "name", "type"])}
+
+    for row in block.find("_ma_qa_metric_global.", ["metric_id", "metric_value"]):
+        name, _ = metric_info.get(row[0], ("", ""))
+        key = GLOBAL_METRIC_MAP.get(name)
+        if key is None:
+            continue
+        try:
+            out[key] = float(row[1])
+        except ValueError:
+            pass
+
+    # Identify the PAE metric_id by name aliases or type — predictor-dependent.
+    pae_metric_id = None
+    for mid, (name, mtype) in metric_info.items():
+        n, t = name.lower(), mtype.lower()
+        if "pae" in n or "aligned error" in n or t == "pae":
+            pae_metric_id = mid
+            break
+
+    if pae_metric_id is not None:
+        pae_rows = []
+        for row in block.find("_ma_qa_metric_local_pairwise.",
+                              ["label_asym_id_1", "seq_id_1",
+                               "label_asym_id_2", "seq_id_2",
+                               "metric_value", "metric_id"]):
+            if row[5] != pae_metric_id:
+                continue
+            try:
+                pae_rows.append((row[0], int(row[1]), row[2], int(row[3]), float(row[4])))
+            except ValueError:
+                continue
+
+        if pae_rows:
+            residues = sorted({(c, s) for c, s, _, _, _ in pae_rows} |
+                              {(c, s) for _, _, c, s, _ in pae_rows})
+            idx = {r: i for i, r in enumerate(residues)}
+            pae = np.full((len(residues), len(residues)), np.nan)
+            for c1, s1, c2, s2, v in pae_rows:
+                pae[idx[(c1, s1)], idx[(c2, s2)]] = v
+            # Some predictors only store the upper triangle; fill the missing
+            # transpose. PAE is asymmetric, so only fill where the cell is NaN.
+            nan_mask = np.isnan(pae)
+            pae[nan_mask] = pae.T[nan_mask]
+            out["pae"] = pae
+
+    return out
+
+
+def find_sibling_json(path: Path) -> dict:
+    """Search for PAE/confidence JSON files alongside the structure.
+
+    Returns a dict that may contain: pae, iptm, ptm, ranking_score.
+    """
     parent = path.parent
     stem = path.stem
     extra: dict = {}
 
-    # Patterns for PAE files
-    pae_patterns = [
-        f"{stem}_pae.json",
-        f"pae_{stem}.json",
-        f"{stem}_full_data_0.json",
-    ]
-    for pat in pae_patterns:
-        pae_path = parent / pat
-        if pae_path.exists():
-            try:
-                data = json.loads(pae_path.read_text())
-                if isinstance(data, list) and len(data) > 0:
-                    if "predicted_aligned_error" in data[0]:
-                        extra["pae"] = np.array(data[0]["predicted_aligned_error"])
-                elif isinstance(data, dict) and "predicted_aligned_error" in data:
-                    extra["pae"] = np.array(data["predicted_aligned_error"])
-            except (json.JSONDecodeError, KeyError):
-                pass
-            break
+    # AF3 Server names structures `<base>_model_N.cif` with siblings
+    # `<base>_full_data_N.json` and `<base>_summary_confidences_N.json` —
+    # different stems, so plain `{stem}_*` patterns miss them.
+    af3 = re.match(r"(.+)_model_(\d+)$", stem)
+    af3_base, af3_n = (af3.group(1), af3.group(2)) if af3 else (None, None)
 
-    # Patterns for confidence/ranking files
-    conf_patterns = [
-        f"{stem}_summary_confidences.json",
-        "summary_confidences.json",
-        "ranking_debug.json",
-        f"{stem}_confidences.json",
+    pae_candidates = []
+    if af3_base is not None:
+        pae_candidates.append(parent / f"{af3_base}_full_data_{af3_n}.json")
+    pae_candidates += [
+        parent / f"{stem}_pae.json",
+        parent / f"pae_{stem}.json",
+        parent / f"{stem}_full_data_0.json",
     ]
-    for pat in conf_patterns:
-        conf_path = parent / pat
-        if conf_path.exists():
-            try:
-                data = json.loads(conf_path.read_text())
-                if "iptm" in data:
-                    extra["iptm"] = float(data["iptm"])
-                if "ptm" in data:
-                    extra["ptm"] = float(data["ptm"])
-                if "iptm+ptm" in data and "iptm" not in data:
-                    extra["iptm"] = float(data["iptm+ptm"])
-            except (json.JSONDecodeError, KeyError):
-                pass
+    for pae_path in pae_candidates:
+        if not pae_path.exists():
+            continue
+        try:
+            data = json.loads(pae_path.read_text())
+        except json.JSONDecodeError:
             break
+        # AF3 server uses "pae"; AF2-Multimer uses "predicted_aligned_error".
+        container = data[0] if isinstance(data, list) and data and isinstance(data[0], dict) else data
+        pae = container.get("pae") if isinstance(container, dict) else None
+        if pae is None and isinstance(container, dict):
+            pae = container.get("predicted_aligned_error")
+        if pae is not None:
+            try:
+                extra["pae"] = np.array(pae)
+            except ValueError:
+                pass
+        break
+
+    conf_candidates = []
+    if af3_base is not None:
+        conf_candidates.append(parent / f"{af3_base}_summary_confidences_{af3_n}.json")
+    conf_candidates += [
+        parent / f"{stem}_summary_confidences.json",
+        parent / "summary_confidences.json",
+        parent / "ranking_debug.json",
+        parent / f"{stem}_confidences.json",
+    ]
+    for conf_path in conf_candidates:
+        if not conf_path.exists():
+            continue
+        try:
+            data = json.loads(conf_path.read_text())
+        except json.JSONDecodeError:
+            break
+        if not isinstance(data, dict):
+            break
+        # Extract each field independently so a null iptm (e.g. AF3 monomers)
+        # doesn't poison ptm or ranking_score.
+        iptm = data.get("iptm")
+        if iptm is None:
+            iptm = data.get("iptm+ptm")
+        if isinstance(iptm, (int, float)):
+            extra["iptm"] = float(iptm)
+        ptm = data.get("ptm")
+        if isinstance(ptm, (int, float)):
+            extra["ptm"] = float(ptm)
+        ranking = data.get("ranking_score")
+        if isinstance(ranking, (int, float)):
+            extra["ranking_score"] = float(ranking)
+        break
 
     return extra
 
 
 def extract_record(path: Path, name: Optional[str] = None) -> StructureRecord:
-    """Extract structure metadata using biotite."""
-    import biotite.structure.io as io
-
+    """Extract structure metadata using gemmi."""
     path = Path(path)
     if name is None:
         name = path.stem
 
-    kind = _detect_kind(path)
-
-    # Load structure with biotite
     try:
-        if path.suffix.lower() in (".cif", ".mmcif"):
-            import biotite.structure.io.pdbx as pdbx
-            file = pdbx.CIFFile.read(str(path))
-            block = list(file.values())[0]
-            atoms = pdbx.get_structure(block, model=1)
-        else:
-            import biotite.structure.io.pdb as pdb_io
-            file = pdb_io.PDBFile.read(str(path))
-            atoms = pdb_io.get_structure(file, model=1)
-    except Exception as e:
-        return StructureRecord(
-            name=name, path=path, kind=kind,
-            chains=[], n_residues=0,
-        )
+        structure = gemmi.read_structure(str(path))
+    except (RuntimeError, ValueError):
+        return StructureRecord(name=name, path=path, chains=[], n_residues=0)
 
-    # Get CA atoms for per-residue analysis
-    ca_mask = atoms.atom_name == "CA"
-    ca_atoms = atoms[ca_mask]
+    if len(structure) == 0:
+        return StructureRecord(name=name, path=path, chains=[], n_residues=0)
+    model = structure[0]
 
-    chains = list(dict.fromkeys(ca_atoms.chain_id))  # unique, ordered
-    n_residues = len(ca_atoms)
+    chain_order: list[str] = []
+    plddt_vals: list[float] = []
+    for chain in model:
+        if chain.name not in chain_order:
+            chain_order.append(chain.name)
+        for residue in chain:
+            for atom in residue:
+                if atom.name == "CA":
+                    plddt_vals.append(atom.b_iso)
+                    break
 
-    # Check B-factor column for pLDDT
-    # biotite 1.2+ doesn't auto-populate b_factor; read from atom_site directly for CIF
     plddt = None
-    b_factors = None
-    if n_residues > 0:
-        if hasattr(ca_atoms, "b_factor"):
-            b_factors = ca_atoms.b_factor
-        elif path.suffix.lower() in (".cif", ".mmcif"):
-            try:
-                atom_site = block["atom_site"]
-                all_b = np.array(atom_site["B_iso_or_equiv"].as_array(), dtype=np.float64)
-                all_atom_names = atom_site["label_atom_id"].as_array()
-                ca_b_mask = np.array([n == "CA" for n in all_atom_names])
-                b_factors = all_b[ca_b_mask]
-            except (KeyError, ValueError):
-                pass
-        if b_factors is not None and len(b_factors) > 0:
-            bmin, bmax = float(np.min(b_factors)), float(np.max(b_factors))
-            std = float(np.std(b_factors))
-            # pLDDT is 0-100 with meaningful variance
-            if 0 <= bmin and bmax <= 100 and std > 0.5:
-                plddt = b_factors.astype(np.float64)
-                if kind == "unknown":
-                    kind = "af2_single" if len(chains) == 1 else "af3_complex"
+    if plddt_vals:
+        arr = np.array(plddt_vals, dtype=np.float64)
+        # pLDDT is 0-100 with meaningful variance; otherwise it's a real B-factor.
+        if 0 <= float(arr.min()) and float(arr.max()) <= 100 and float(arr.std()) > 0.5:
+            plddt = arr
 
-    # Look for sibling JSON files
-    sibling = _find_sibling_json(path)
+    # CIF-embedded metrics take precedence over sibling JSON.
+    merged = {**find_sibling_json(path), **metrics_from_cif(path)}
 
     return StructureRecord(
         name=name,
         path=path,
-        kind=kind,
-        chains=chains,
-        n_residues=n_residues,
+        chains=chain_order,
+        n_residues=len(plddt_vals),
         plddt=plddt,
-        pae=sibling.get("pae"),
-        iptm=sibling.get("iptm"),
-        ptm=sibling.get("ptm"),
+        pae=merged.get("pae"),
+        iptm=merged.get("iptm"),
+        ptm=merged.get("ptm"),
+        ranking_score=merged.get("ranking_score"),
     )
 
 

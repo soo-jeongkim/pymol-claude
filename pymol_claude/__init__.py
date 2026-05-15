@@ -14,11 +14,11 @@ from typing import Optional
 # Ensure the pymol_claude package is importable even when loaded as a PyMOL
 # startup plugin from the app bundle. The project root (parent of pymol_claude/)
 # must be on sys.path so that "from pymol_claude.mcp_server import ..." works.
-_project_root = str(Path(__file__).resolve().parent.parent)
-if _project_root not in sys.path:
-    sys.path.insert(0, _project_root)
+project_root = str(Path(__file__).resolve().parent.parent)
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 
-_server_thread: Optional[threading.Thread] = None
+server_thread: Optional[threading.Thread] = None
 
 
 def __init_plugin__(app=None):
@@ -31,9 +31,9 @@ def start_claude(port: int = 8766):
 
     Can be called from PyMOL command line: start_claude [port]
     """
-    global _server_thread
+    global server_thread
 
-    if _server_thread is not None and _server_thread.is_alive():
+    if server_thread is not None and server_thread.is_alive():
         print("pymol-claude: MCP server is already running")
         return
 
@@ -45,12 +45,12 @@ def start_claude(port: int = 8766):
     server = create_server()
     port = int(port)
 
-    _server_thread = threading.Thread(
+    server_thread = threading.Thread(
         target=server.run,
         kwargs={"transport": "sse", "host": "0.0.0.0", "port": port, "log_level": "warning"},
         daemon=True,
     )
-    _server_thread.start()
+    server_thread.start()
 
     print(f"pymol-claude: MCP server running on http://0.0.0.0:{port}/sse")
 
@@ -60,14 +60,14 @@ def stop_claude():
 
     Note: daemon thread will die when PyMOL exits. This just clears the reference.
     """
-    global _server_thread
-    if _server_thread is None or not _server_thread.is_alive():
+    global server_thread
+    if server_thread is None or not server_thread.is_alive():
         print("pymol-claude: MCP server is not running")
         return
 
     # Daemon threads can't be cleanly stopped; they die with the process.
     # Clear the reference so start_claude can be called again.
-    _server_thread = None
+    server_thread = None
     print("pymol-claude: server reference cleared (thread will stop on PyMOL exit)")
 
 
