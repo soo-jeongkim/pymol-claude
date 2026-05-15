@@ -47,14 +47,14 @@ def main():
             result = f"Loaded {len(paths)} structures"
         print(result)
 
-    print(f"\npymol-claude: MCP server starting on http://0.0.0.0:{args.port}/sse")
-    print(f"pymol-claude: WARNING — server binds 0.0.0.0 (all interfaces)")
+    print(f"\npymol-claude: MCP server starting on http://127.0.0.1:{args.port}/sse")
+    print(f"pymol-claude: bound to loopback — use `ssh -L {args.port}:localhost:{args.port} user@host` to reach it remotely")
     print(f"\nAdd to Claude settings:")
     print(f'  "pymol": {{ "url": "http://localhost:{args.port}/sse" }}')
     print()
 
     # Run blocking (no GUI to keep alive)
-    server.run(transport="sse", host="0.0.0.0", port=args.port)
+    server.run(transport="sse", host="127.0.0.1", port=args.port)
 
 
 if __name__ == "__main__":
