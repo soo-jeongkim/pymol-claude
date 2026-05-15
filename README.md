@@ -55,6 +55,26 @@ That's it. This works globally — you can run `claude` from any directory.
 
 PyMOL must be running first — it's the server, Claude is the client.
 
+### Phone / remote use
+
+Any Claude Code session that can reach the MCP port can drive PyMOL — including one you've started remotely from the Claude mobile app. So you can leave PyMOL running on your workstation and triage structures from your phone:
+
+- "Load the latest fold batch and tell me which model has the best pLDDT"
+- "Any low-confidence loops in model 3?"
+- "Color by chain and render"
+
+Metrics (pLDDT, ipTM, pTM, PAE) are extracted by **gemmi** straight from the mmCIF — no render needed — so you get fast text answers, and Claude does the actual analysis (sorting, comparing, flagging) on top of those numbers. Renders come back inline as PNGs when you ask for them.
+
+### Reusing your existing PyMOL scripts
+
+You can point Claude at a `.py` file full of your own PyMOL functions and ask it to apply them. It reads the script, lists what's in there, and runs the function bodies for you through the `run` tool — defining any custom colors or settings the script depends on.
+
+Example:
+
+> "Look at `~/scripts/my_pymol_helpers.py` — what view templates do you have? Apply the publication-style one to all loaded objects."
+
+Claude will scan the script, summarize the available functions (e.g. `pic`, `pic2`, `ball_and_stick`, `bspec1`, …), then execute the chosen one against your current session. Useful for porting old `.pymolrc` setups or lab-specific styling presets without rewriting them as MCP tools.
+
 ## Available tools
 
 **Visualization:** load, delete, list_objects, show, hide, color, color_by_plddt, color_by_chain, color_by_spectrum, select, zoom, center, orient, turn, bg_color, set_setting
