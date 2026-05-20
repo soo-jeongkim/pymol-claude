@@ -16,13 +16,23 @@ class TriageState:
     records: dict[str, StructureRecord] = field(default_factory=dict)
     index: int = 0
     flags: list[dict] = field(default_factory=list)
-    _filter_indices: Optional[list[int]] = field(default=None, repr=False)
+    filter_indices: Optional[list[int]] = field(default=None, repr=False)
 
     @property
     def active_indices(self) -> list[int]:
-        if self._filter_indices is not None:
-            return self._filter_indices
+        if self.filter_indices is not None:
+            return self.filter_indices
         return list(range(len(self.files)))
+
+    def record_for_obj(self, obj_name: str) -> Optional[StructureRecord]:
+        """Look up a record by PyMOL object name (file stem) or filename."""
+        rec = self.records.get(obj_name)
+        if rec is not None:
+            return rec
+        for fname, candidate in self.records.items():
+            if candidate.name == obj_name or fname == obj_name:
+                return candidate
+        return None
 
     @property
     def count(self) -> int:
@@ -47,18 +57,13 @@ class TriageState:
         self.records = {}
         self.index = 0
         self.flags = []
-        self._filter_indices = None
+        self.filter_indices = None
 
         for f in found:
             record = extract_record(f)
             self.records[f.name] = record
 
-        # Sort by mean pLDDT descending (None values last)
-        sorted_records = sorted(
-            self.records.values(),
-            key=lambda r: r.mean_plddt if r.mean_plddt is not None else -1,
-            reverse=True,
-        )
+        sorted_records = sorted(self.records.values(), key=StructureRecord.sort_key, reverse=True)
 
         lines = [f"Loaded {len(found)} structures from {path.name}/"]
         for r in sorted_records[:10]:
@@ -139,18 +144,18 @@ class TriageState:
         """Export flags as JSON."""
         return json.dumps(self.flags, indent=2)
 
-    def filter(self, min_plddt: float = 0, max_plddt: float = 100) -> str:
-        """Filter structures by pLDDT range."""
+    def filter(self, min_plddt: float, max_plddt: float, include_unscored: bool = False) -> str:
+        """Filter structures by pLDDT range. Unscored records are excluded unless include_unscored=True."""
         matching = []
         for i, f in enumerate(self.files):
             record = self.records.get(f.name)
-            if record and record.mean_plddt is not None:
-                if min_plddt <= record.mean_plddt <= max_plddt:
+            if record is None or record.mean_plddt is None:
+                if include_unscored:
                     matching.append(i)
-            elif min_plddt == 0:
-                # Include structures without pLDDT if min is 0
+                continue
+            if min_plddt <= record.mean_plddt <= max_plddt:
                 matching.append(i)
 
-        self._filter_indices = matching if len(matching) < len(self.files) else None
+        self.filter_indices = matching if len(matching) < len(self.files) else None
         self.index = 0
         return f"Filter: {len(matching)}/{len(self.files)} structures with pLDDT in [{min_plddt}, {max_plddt}]"

@@ -12,10 +12,13 @@ from pathlib import Path
 from fastmcp import FastMCP
 from fastmcp.utilities.types import Image
 
+from pymol_claude.metrics import StructureRecord
 from pymol_claude.triage import TriageState
 
 pymol_lock = threading.Lock()
 triage = TriageState()
+
+PLDDT_PALETTE = "red_yellow_green_cyan_blue"
 
 
 def ensure_pymol():
@@ -28,6 +31,11 @@ def ensure_pymol():
             "PyMOL is not installed. Install it with: "
             "/Applications/PyMOL.app/Contents/bin/python -m pip install -e ."
         )
+
+
+def apply_plddt_palette(cmd, selection: str = "all") -> None:
+    """Color selection by pLDDT (b-factor 0–100, project palette)."""
+    cmd.spectrum("b", PLDDT_PALETTE, selection, 0, 100)
 
 
 def render_image(width: int, height: int, ray: bool = False) -> Image:
@@ -70,7 +78,7 @@ def triage_render(path: Path, width: int = 800, height: int = 600) -> Image:
     cmd.enable(obj_name)
     cmd.show("cartoon", obj_name)
     cmd.hide("lines", obj_name)
-    cmd.spectrum("b", "red_yellow_green_cyan_blue", obj_name, 0, 100)
+    apply_plddt_palette(cmd, obj_name)
     cmd.orient(obj_name)
     cmd.bg_color("white")
     return render_image(width, height, ray=False)
@@ -99,7 +107,7 @@ def create_server() -> FastMCP:
             "flag / show_flags / export_flags / filter — triage workflow (stateful + renders)\n\n"
             "Conventions:\n"
             "- B-factor on predicted structures is pLDDT (0-100). Call it pLDDT.\n"
-            "- pLDDT palette: `cmd.spectrum('b', 'red_yellow_green_cyan_blue', sel, 0, 100)`.\n"
+            "- For pLDDT coloring use the `color_by_plddt` tool (don't reinvent the palette).\n"
             "- Selection syntax: 'chain A', 'resi 45-67', 'chain A and resi 45-67', "
             "'name CA', 'polymer', 'organic', 'all'.\n"
             "- When triaging (next/prev/flag), always report mean pLDDT and ipTM alongside the image."
@@ -110,10 +118,10 @@ def create_server() -> FastMCP:
 
     @mcp.tool()
     def color_by_plddt(selection: str = "all") -> str:
-        """Color by pLDDT (B-factor column) with the project palette: blue=high, red=low."""
+        """Color by pLDDT (B-factor 0–100) with the project palette: blue=high, red=low."""
         cmd = ensure_pymol()
         with pymol_lock:
-            cmd.spectrum("b", "red_yellow_green_cyan_blue", selection, 0, 100)
+            apply_plddt_palette(cmd, selection)
             return f"Colored {selection} by pLDDT"
 
     @mcp.tool()
@@ -134,28 +142,22 @@ def create_server() -> FastMCP:
     def get_metrics(name: str = "") -> str:
         """Get detailed structure metrics (pLDDT, ipTM, pTM, PAE)."""
         cmd = ensure_pymol()
-        from pymol_claude.metrics import extract_record
 
         with pymol_lock:
             objects = cmd.get_object_list()
-            if not objects:
-                return "No objects loaded"
-            if name and name not in objects:
-                return f"Object '{name}' not found. Loaded: {', '.join(objects)}"
+        if not objects:
+            return "No objects loaded"
+        if name and name not in objects:
+            return f"Object '{name}' not found. Loaded: {', '.join(objects)}"
 
         targets = [name] if name else objects
         results = []
         for obj_name in targets:
-            record = triage.records.get(obj_name)
+            record = triage.record_for_obj(obj_name)
             if record is None:
-                for fname, rec in triage.records.items():
-                    if rec.name == obj_name:
-                        record = rec
-                        break
-            if record is not None:
-                results.append(record.format_report())
-            else:
                 results.append(f"{obj_name}: no metrics available (load via triage or provide file path)")
+            else:
+                results.append(record.format_report())
         return "\n\n".join(results)
 
     @mcp.tool()
@@ -164,24 +166,25 @@ def create_server() -> FastMCP:
         from pymol_claude.metrics import find_low_confidence as find_low
 
         if name:
-            for fname, rec in triage.records.items():
-                if rec.name == name or fname == name:
-                    return find_low(rec, threshold)
-            return f"No metrics for '{name}'. Load the structure directory first."
+            record = triage.record_for_obj(name)
+            if record is None:
+                return f"No metrics for '{name}'. Load the structure directory first."
+            return find_low(record, threshold)
 
         cmd = ensure_pymol()
         with pymol_lock:
             objects = cmd.get_object_list()
+        if not objects:
+            return "No objects loaded"
 
         results = []
         for obj in objects:
-            for fname, rec in triage.records.items():
-                if rec.name == obj:
-                    results.append(find_low(rec, threshold))
-                    break
-            else:
+            record = triage.record_for_obj(obj)
+            if record is None:
                 results.append(f"{obj}: no metrics available")
-        return "\n\n".join(results) if results else "No objects loaded"
+            else:
+                results.append(find_low(record, threshold))
+        return "\n\n".join(results)
 
     @mcp.tool()
     def compare_all() -> str:
@@ -189,11 +192,7 @@ def create_server() -> FastMCP:
         if not triage.records:
             return "No structures loaded in triage. Use load_directory first."
 
-        records = sorted(
-            triage.records.values(),
-            key=lambda r: r.mean_plddt if r.mean_plddt is not None else -1,
-            reverse=True,
-        )
+        records = sorted(triage.records.values(), key=StructureRecord.sort_key, reverse=True)
 
         lines = [f"{'Name':<30} {'pLDDT':>8} {'ipTM':>8} {'pTM':>8} {'Chains':>6} {'Res':>6}"]
         lines.append("-" * 70)
@@ -273,17 +272,15 @@ def create_server() -> FastMCP:
         return triage.export_flags()
 
     @mcp.tool()
-    def filter(min_plddt: float = 0, max_plddt: float = 100) -> str:
-        """Filter triage structures by pLDDT range."""
-        return triage.filter(min_plddt, max_plddt)
+    def filter(min_plddt: float, max_plddt: float, include_unscored: bool = False) -> str:
+        """Filter triage structures by pLDDT range. Unscored records excluded unless include_unscored=True."""
+        return triage.filter(min_plddt, max_plddt, include_unscored)
 
     # ── File inspection ────────────────────────────────────────────────────
 
     @mcp.tool()
     def cif_grep(tag: str, path: str = ".") -> str:
-        """Search CIF files for a tag's value (Python equivalent of `gemmi grep`).
-        tag is a CIF item like '_ma_qa_metric_global.metric_value'.
-        path is a single file or directory (recursive on *.cif)."""
+        """Search CIF files for a tag's value (e.g. '_ma_qa_metric_global.metric_value'). path may be a file or a directory (recursed on *.cif)."""
         import gemmi
         p = Path(path).expanduser()
         if p.is_dir():

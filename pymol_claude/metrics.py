@@ -30,6 +30,10 @@ class StructureRecord:
             return float(np.mean(self.plddt))
         return None
 
+    def sort_key(self) -> float:
+        """Sortable pLDDT (missing → -inf so unscored records sink to the bottom)."""
+        return self.mean_plddt if self.mean_plddt is not None else float("-inf")
+
     @property
     def plddt_summary(self) -> str:
         if self.plddt is None:
@@ -89,8 +93,10 @@ def metrics_from_cif(path: Path) -> dict:
                    for row in block.find("_ma_qa_metric.", ["id", "name", "type"])}
 
     for row in block.find("_ma_qa_metric_global.", ["metric_id", "metric_value"]):
-        name, _ = metric_info.get(row[0], ("", ""))
-        key = GLOBAL_METRIC_MAP.get(name)
+        info = metric_info.get(row[0])
+        if info is None:
+            continue
+        key = GLOBAL_METRIC_MAP.get(info[0])
         if key is None:
             continue
         try:

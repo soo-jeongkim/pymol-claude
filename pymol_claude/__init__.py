@@ -68,7 +68,7 @@ def stop_claude():
     # Daemon threads can't be cleanly stopped; they die with the process.
     # Clear the reference so start_claude can be called again.
     server_thread = None
-    print("pymol-claude: server reference cleared (thread will stop on PyMOL exit)")
+    print("pymol-claude: Server reference cleared (thread will stop on PyMOL exit)")
 
 
 # Register PyMOL commands
