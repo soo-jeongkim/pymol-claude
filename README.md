@@ -77,17 +77,15 @@ Claude will scan the script, summarize the available functions (e.g. `pic`, `pic
 
 ## Available tools
 
-**Visualization:** load, delete, list_objects, show, hide, color, color_by_plddt, color_by_chain, color_by_spectrum, select, zoom, center, orient, turn, bg_color, set_setting
+The main tool is **`run(code)`** — arbitrary Python with `cmd` (pymol.cmd) bound. Claude writes the PyMOL itself rather than calling a wrapper for every verb: `run("cmd.load('foo.cif'); cmd.show('cartoon'); cmd.color('salmon', 'chain A')")`.
 
-**Structural analysis:** align, super_align, polar_contacts, measure, get_sequence, get_chains, count_atoms
+The dedicated tools cover what `run` can't:
 
-**Rendering:** render (ray-traced), snapshot (fast)
+**Rendering (return PNGs inline):** `render` (ray-traced), `snapshot` (fast), `color_by_plddt` (project palette)
 
-**Metrics (gemmi):** get_metrics, find_low_confidence, compare_all
+**Metrics (gemmi, not PyMOL):** `get_metrics`, `find_low_confidence`, `compare_all`, `cif_grep`
 
-**Triage:** load_directory, next_structure, prev_structure, go_to, current, flag, show_flags, export_flags, filter
-
-**Escape hatch:** run (arbitrary PyMOL/Python code)
+**Triage (stateful navigation + rendered images):** `load_directory`, `next_structure`, `prev_structure`, `go_to`, `current`, `flag`, `show_flags`, `export_flags`, `filter`
 
 ## PyMOL commands
 
