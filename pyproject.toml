@@ -11,6 +11,12 @@ dependencies = [
     "rich>=13",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "pre-commit",
+    "ruff",
+]
+
 [project.scripts]
 pymol-claude = "pymol_claude.cli:main"
 

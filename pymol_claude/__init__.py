@@ -38,6 +38,7 @@ def start_mcp(port: int = 8766):
         return
 
     import os
+
     os.environ["FASTMCP_LOG_LEVEL"] = "WARNING"
 
     from pymol_claude.mcp_server import create_server
@@ -47,7 +48,12 @@ def start_mcp(port: int = 8766):
 
     server_thread = threading.Thread(
         target=server.run,
-        kwargs={"transport": "sse", "host": "127.0.0.1", "port": port, "log_level": "warning"},
+        kwargs={
+            "transport": "sse",
+            "host": "127.0.0.1",
+            "port": port,
+            "log_level": "warning",
+        },
         daemon=True,
     )
     server_thread.start()
@@ -74,6 +80,7 @@ def stop_mcp():
 # Register PyMOL commands
 try:
     from pymol import cmd
+
     cmd.extend("start_mcp", start_mcp)
     cmd.extend("stop_mcp", stop_mcp)
 except ImportError:

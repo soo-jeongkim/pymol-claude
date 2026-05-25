@@ -102,15 +102,19 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     p_install.add_argument(
-        "--port", type=int, default=DEFAULT_PORT,
+        "--port",
+        type=int,
+        default=DEFAULT_PORT,
         help=f"MCP server port (default: {DEFAULT_PORT})",
     )
     p_install.add_argument(
-        "--project", action="store_true",
+        "--project",
+        action="store_true",
         help="Write project-level config (./.cursor/mcp.json) instead of global",
     )
     p_install.add_argument(
-        "--project-dir", default=".",
+        "--project-dir",
+        default=".",
         help="Project root for --project (default: current directory)",
     )
     p_install.set_defaults(func=cmd_install_config)

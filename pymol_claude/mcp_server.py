@@ -25,6 +25,7 @@ def ensure_pymol():
     """Import pymol.cmd, raising a clear error if unavailable."""
     try:
         from pymol import cmd
+
         return cmd
     except ImportError:
         raise RuntimeError(
@@ -53,6 +54,7 @@ def render_image(width: int, height: int, ray: bool = False) -> Image:
 
         # PyMOL's png command may be async; wait for file
         import time
+
         for _ in range(50):
             if os.path.exists(tmp_path) and os.path.getsize(tmp_path) > 0:
                 break
@@ -155,7 +157,9 @@ def create_server() -> FastMCP:
         for obj_name in targets:
             record = triage.record_for_obj(obj_name)
             if record is None:
-                results.append(f"{obj_name}: no metrics available (load via triage or provide file path)")
+                results.append(
+                    f"{obj_name}: no metrics available (load via triage or provide file path)"
+                )
             else:
                 results.append(record.format_report())
         return "\n\n".join(results)
@@ -192,9 +196,13 @@ def create_server() -> FastMCP:
         if not triage.records:
             return "No structures loaded in triage. Use load_directory first."
 
-        records = sorted(triage.records.values(), key=StructureRecord.sort_key, reverse=True)
+        records = sorted(
+            triage.records.values(), key=StructureRecord.sort_key, reverse=True
+        )
 
-        lines = [f"{'Name':<30} {'pLDDT':>8} {'ipTM':>8} {'pTM':>8} {'Chains':>6} {'Res':>6}"]
+        lines = [
+            f"{'Name':<30} {'pLDDT':>8} {'ipTM':>8} {'pTM':>8} {'Chains':>6} {'Res':>6}"
+        ]
         lines.append("-" * 70)
         for r in records:
             plddt = f"{r.mean_plddt:.1f}" if r.mean_plddt is not None else "—"
@@ -272,7 +280,9 @@ def create_server() -> FastMCP:
         return triage.export_flags()
 
     @mcp.tool()
-    def filter(min_plddt: float, max_plddt: float, include_unscored: bool = False) -> str:
+    def filter(
+        min_plddt: float, max_plddt: float, include_unscored: bool = False
+    ) -> str:
         """Filter triage structures by pLDDT range. Unscored records excluded unless include_unscored=True."""
         return triage.filter(min_plddt, max_plddt, include_unscored)
 
@@ -282,6 +292,7 @@ def create_server() -> FastMCP:
     def cif_grep(tag: str, path: str = ".") -> str:
         """Search CIF files for a tag's value (e.g. '_ma_qa_metric_global.metric_value'). path may be a file or a directory (recursed on *.cif)."""
         import gemmi
+
         p = Path(path).expanduser()
         if p.is_dir():
             targets = sorted(p.rglob("*.cif"))

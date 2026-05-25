@@ -13,16 +13,22 @@ from pathlib import Path
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Start pymol-claude MCP server in headless mode")
+    parser = argparse.ArgumentParser(
+        description="Start pymol-claude MCP server in headless mode"
+    )
     parser.add_argument("files", nargs="*", help="Structure files to load into triage")
-    parser.add_argument("--port", type=int, default=8766, help="MCP server port (default: 8766)")
+    parser.add_argument(
+        "--port", type=int, default=8766, help="MCP server port (default: 8766)"
+    )
     args = parser.parse_args()
 
     # Verify PyMOL is available
     try:
-        from pymol import cmd
+        __import__("pymol")
     except ImportError:
-        print("Error: PyMOL is not available. Run this with: pymol -cq -r start_headless.py")
+        print(
+            "Error: PyMOL is not available. Run this with: pymol -cq -r start_headless.py"
+        )
         sys.exit(1)
 
     from pymol_claude.mcp_server import create_server, triage
@@ -38,6 +44,7 @@ def main():
         else:
             # Load individual files
             from pymol_claude.metrics import extract_record
+
             triage.files = paths
             for p in paths:
                 if p.exists():
@@ -47,12 +54,18 @@ def main():
         print(result)
 
     print(f"\npymol-claude: MCP server starting on http://127.0.0.1:{args.port}/sse")
-    print(f"\nFor remote use, tunnel the port to your laptop:")
+    print("\nFor remote use, tunnel the port to your laptop:")
     print(f"  ssh -L {args.port}:localhost:{args.port} user@host")
-    print(f"\nThen, on the machine running your MCP client, wire it up:")
-    print(f"  pymol-claude install-config --port {args.port}                                # Cursor")
-    print(f"  claude mcp add --transport sse --scope user pymol http://localhost:{args.port}/sse  # Claude Code")
-    print(f"\nOr add this entry by hand to ~/.cursor/mcp.json or your Claude Code config:")
+    print("\nThen, on the machine running your MCP client, wire it up:")
+    print(
+        f"  pymol-claude install-config --port {args.port}                                # Cursor"
+    )
+    print(
+        f"  claude mcp add --transport sse --scope user pymol http://localhost:{args.port}/sse  # Claude Code"
+    )
+    print(
+        "\nOr add this entry by hand to ~/.cursor/mcp.json or your Claude Code config:"
+    )
     print(f'  "pymol": {{ "url": "http://localhost:{args.port}/sse" }}')
     print()
 

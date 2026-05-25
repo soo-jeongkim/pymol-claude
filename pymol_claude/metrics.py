@@ -41,7 +41,9 @@ class StructureRecord:
         mean = self.mean_plddt
         high = float(np.sum(self.plddt >= 90) / len(self.plddt) * 100)
         low = float(np.sum(self.plddt < 50) / len(self.plddt) * 100)
-        return f"mean={mean:.1f}, {high:.0f}% very high (>=90), {low:.0f}% very low (<50)"
+        return (
+            f"mean={mean:.1f}, {high:.0f}% very high (>=90), {low:.0f}% very low (<50)"
+        )
 
     def format_report(self) -> str:
         lines = [
@@ -52,19 +54,23 @@ class StructureRecord:
         ]
         if self.plddt is not None:
             lines.append(f"  pLDDT: {self.plddt_summary}")
-            lines.append(f"    Interpretation: "
-                         f">90 very high confidence, "
-                         f"70-90 confident, "
-                         f"50-70 low confidence, "
-                         f"<50 very low")
+            lines.append(
+                "    Interpretation: "
+                ">90 very high confidence, "
+                "70-90 confident, "
+                "50-70 low confidence, "
+                "<50 very low"
+            )
         if self.ptm is not None:
             lines.append(f"  pTM: {self.ptm:.3f}")
         if self.iptm is not None:
             lines.append(f"  ipTM: {self.iptm:.3f}")
-            lines.append(f"    Interpretation: "
-                         f">0.8 confident interaction, "
-                         f"0.6-0.8 possible, "
-                         f"<0.6 unlikely")
+            lines.append(
+                "    Interpretation: "
+                ">0.8 confident interaction, "
+                "0.6-0.8 possible, "
+                "<0.6 unlikely"
+            )
         if self.ranking_score is not None:
             lines.append(f"  ranking_score: {self.ranking_score:.3f}")
         if self.pae is not None:
@@ -89,8 +95,10 @@ def metrics_from_cif(path: Path) -> dict:
     out: dict = {}
 
     # Build metric_id → (name, type) so we can look up by either field.
-    metric_info = {row[0]: (row[1], row[2])
-                   for row in block.find("_ma_qa_metric.", ["id", "name", "type"])}
+    metric_info = {
+        row[0]: (row[1], row[2])
+        for row in block.find("_ma_qa_metric.", ["id", "name", "type"])
+    }
 
     for row in block.find("_ma_qa_metric_global.", ["metric_id", "metric_value"]):
         info = metric_info.get(row[0])
@@ -114,20 +122,31 @@ def metrics_from_cif(path: Path) -> dict:
 
     if pae_metric_id is not None:
         pae_rows = []
-        for row in block.find("_ma_qa_metric_local_pairwise.",
-                              ["label_asym_id_1", "seq_id_1",
-                               "label_asym_id_2", "seq_id_2",
-                               "metric_value", "metric_id"]):
+        for row in block.find(
+            "_ma_qa_metric_local_pairwise.",
+            [
+                "label_asym_id_1",
+                "seq_id_1",
+                "label_asym_id_2",
+                "seq_id_2",
+                "metric_value",
+                "metric_id",
+            ],
+        ):
             if row[5] != pae_metric_id:
                 continue
             try:
-                pae_rows.append((row[0], int(row[1]), row[2], int(row[3]), float(row[4])))
+                pae_rows.append(
+                    (row[0], int(row[1]), row[2], int(row[3]), float(row[4]))
+                )
             except ValueError:
                 continue
 
         if pae_rows:
-            residues = sorted({(c, s) for c, s, _, _, _ in pae_rows} |
-                              {(c, s) for _, _, c, s, _ in pae_rows})
+            residues = sorted(
+                {(c, s) for c, s, _, _, _ in pae_rows}
+                | {(c, s) for _, _, c, s, _ in pae_rows}
+            )
             idx = {r: i for i, r in enumerate(residues)}
             pae = np.full((len(residues), len(residues)), np.nan)
             for c1, s1, c2, s2, v in pae_rows:
@@ -172,7 +191,11 @@ def find_sibling_json(path: Path) -> dict:
         except json.JSONDecodeError:
             break
         # AF3 server uses "pae"; AF2-Multimer uses "predicted_aligned_error".
-        container = data[0] if isinstance(data, list) and data and isinstance(data[0], dict) else data
+        container = (
+            data[0]
+            if isinstance(data, list) and data and isinstance(data[0], dict)
+            else data
+        )
         pae = container.get("pae") if isinstance(container, dict) else None
         if pae is None and isinstance(container, dict):
             pae = container.get("predicted_aligned_error")
@@ -288,15 +311,20 @@ def find_low_confidence(record: StructureRecord, threshold: int = 70) -> str:
                 in_region = False
 
     if in_region:
-        regions.append((start, len(record.plddt) - 1,
-                        float(np.mean(record.plddt[start:]))))
+        regions.append(
+            (start, len(record.plddt) - 1, float(np.mean(record.plddt[start:])))
+        )
 
     if not regions:
         return f"{record.name}: no regions below pLDDT {threshold}"
 
-    lines = [f"{record.name}: {len(regions)} low-confidence regions (threshold={threshold}):"]
+    lines = [
+        f"{record.name}: {len(regions)} low-confidence regions (threshold={threshold}):"
+    ]
     for start, end, mean_val in regions:
         length = end - start + 1
-        lines.append(f"  residues {start + 1}-{end + 1} ({length} residues, mean pLDDT={mean_val:.1f})")
+        lines.append(
+            f"  residues {start + 1}-{end + 1} ({length} residues, mean pLDDT={mean_val:.1f})"
+        )
 
     return "\n".join(lines)

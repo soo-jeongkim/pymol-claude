@@ -46,8 +46,7 @@ class TriageState:
 
         extensions = {".cif", ".mmcif", ".pdb", ".ent"}
         found = sorted(
-            f for f in path.iterdir()
-            if f.suffix.lower() in extensions and f.is_file()
+            f for f in path.iterdir() if f.suffix.lower() in extensions and f.is_file()
         )
 
         if not found:
@@ -63,11 +62,15 @@ class TriageState:
             record = extract_record(f)
             self.records[f.name] = record
 
-        sorted_records = sorted(self.records.values(), key=StructureRecord.sort_key, reverse=True)
+        sorted_records = sorted(
+            self.records.values(), key=StructureRecord.sort_key, reverse=True
+        )
 
         lines = [f"Loaded {len(found)} structures from {path.name}/"]
         for r in sorted_records[:10]:
-            plddt_str = f"pLDDT={r.mean_plddt:.1f}" if r.mean_plddt is not None else "no pLDDT"
+            plddt_str = (
+                f"pLDDT={r.mean_plddt:.1f}" if r.mean_plddt is not None else "no pLDDT"
+            )
             iptm_str = f", ipTM={r.iptm:.3f}" if r.iptm is not None else ""
             lines.append(f"  {r.name}: {plddt_str}{iptm_str}")
         if len(found) > 10:
@@ -135,7 +138,11 @@ class TriageState:
 
         lines = [f"{len(self.flags)} flagged structures:"]
         for i, f in enumerate(self.flags, 1):
-            plddt_str = f"pLDDT={f['mean_plddt']:.1f}" if f["mean_plddt"] is not None else "no pLDDT"
+            plddt_str = (
+                f"pLDDT={f['mean_plddt']:.1f}"
+                if f["mean_plddt"] is not None
+                else "no pLDDT"
+            )
             note_str = f" — {f['note']}" if f["note"] else ""
             lines.append(f"  {i}. {f['name']} ({plddt_str}){note_str}")
         return "\n".join(lines)
@@ -144,7 +151,9 @@ class TriageState:
         """Export flags as JSON."""
         return json.dumps(self.flags, indent=2)
 
-    def filter(self, min_plddt: float, max_plddt: float, include_unscored: bool = False) -> str:
+    def filter(
+        self, min_plddt: float, max_plddt: float, include_unscored: bool = False
+    ) -> str:
         """Filter structures by pLDDT range. Unscored records are excluded unless include_unscored=True."""
         matching = []
         for i, f in enumerate(self.files):
