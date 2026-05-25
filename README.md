@@ -1,16 +1,18 @@
 # pymol-claude
 
-PyMOL plugin that turns PyMOL into an MCP server. Drive PyMOL — load, color, align, score, render — from Claude Code, Cursor, or any MCP client.
+tldr - PyMOL plugin that turns PyMOL into an MCP server. Drive PyMOL from Claude Code, Cursor, or any MCP client.
 
 ## What it is
 
-`pymol-claude` lets you drive PyMOL from Cursor or Claude Code (or any MCP client) in English — load structures, color, align, score, render. PyMOL hosts the MCP server; your editor is the client. Start PyMOL once and leave it running.
+`pymol-claude` lets you drive PyMOL from Cursor or Claude Code (or any MCP client) in English — load structures, color, align, score, render.
 
-It ships with `gemmi`-backed metric tools, so pLDDT, ipTM, pTM, and PAE are read straight from mmCIF without rendering — triage queries like "which model has the worst ipTM?" come back as fast text answers. You can also drop a `.py` of your own PyMOL helpers anywhere on disk and ask the agent to load it; your lab's view presets and analysis functions work without being rewritten as MCP tools.
+It ships with `gemmi`-backed metric tools, so pLDDT, ipTM, pTM, and PAE can be read from the CIF (or PDB) files without rendering. You can use it to triage with queries like "which design has the worst ipTM?" come back as fast text answers. You can also drop a `.py` of your own PyMOL custom presets and analysis functions within the cloned dir and ask the agent to use it.
 
-Because it works over Claude Code, anything you can do in a Claude Code session you can do here — including `/remote-control`, which lets you drive your workstation's PyMOL from the Claude mobile app. Triage a fold batch from your phone on the train.
+Because it can work over Claude Code, anything you can do in a Claude Code session you can do here — including `/remote-control`, which lets you drive your workstation's PyMOL from the Claude mobile app.
 
-A typical session in Claude Code:
+For cluster users: run PyMOL locally as usual and point it at your remote CIFs through your mounted cluster path as per usual (SSHFS/NFS/etc.), anything visible locally works!
+
+An example session in Claude Code/cursor:
 
 ```
 > Load all the CIF files in /path/to/dir/w/predicted/structures/
@@ -20,13 +22,14 @@ Loaded all structures, sorted by mean pLDDT.
 > Which one has the worst ipTM?
 model_3 — ipTM 0.41 (others are 0.7+).
 
-> Show me the low-confidence loops on model_3.
+> Show me the low-confidence loops on structure_500.
 [renders cartoon on PyMOL window, residues 142–168 highlighted, mean pLDDT 38]
+
 ```
 
 ## Install
 
-The plugin installs into **PyMOL's bundled Python**, not your system Python. PyMOL has to be running for any of this to work.
+The plugin installs into **PyMOL's bundled Python**, not your system Python.
 
 ### 1. Clone
 
@@ -194,20 +197,6 @@ A stateful navigator for reviewing a batch of structures (the mobile-eval workfl
 start_mcp [port]   # auto-runs on plugin load; use this to restart on a new port
 stop_mcp           # stop the server
 ```
-
-**Running headless (no GUI, e.g. on a cluster):**
-
-```bash
-pymol -cq -r start_headless.py -- --port 8766 /path/to/structures/
-```
-
-Then tunnel the port back to your laptop:
-
-```bash
-ssh -L 8766:localhost:8766 user@host
-```
-
-…and point your local MCP client at `http://localhost:8766/sse`.
 
 **Skipping the pip install.** To run from this clone without installing, point `~/.pymolrc.py` at it via `sys.path`:
 
