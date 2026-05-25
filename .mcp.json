@@ -1,7 +1,0 @@
-{
-  "mcpServers": {
-    "pymol": {
-      "url": "http://localhost:8766/sse"
-    }
-  }
-}

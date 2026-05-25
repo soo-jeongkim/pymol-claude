@@ -48,7 +48,7 @@ def main():
 
     print(f"\npymol-claude: MCP server starting on http://127.0.0.1:{args.port}/sse")
     print(f"pymol-claude: bound to loopback — use `ssh -L {args.port}:localhost:{args.port} user@host` to reach it remotely")
-    print(f"\nAdd to Claude settings:")
+    print(f"\nAdd to your MCP client settings:")
     print(f'  "pymol": {{ "url": "http://localhost:{args.port}/sse" }}')
     print()
 

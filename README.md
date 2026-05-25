@@ -11,37 +11,40 @@ git clone <repo-url> pymol-claude
 cd pymol-claude
 ```
 
-### 2. Tell PyMOL where the plugin lives (recommended)
+### 2. Install into PyMOL's Python
 
-Add this once to `~/.pymolrc.py` (edit manually, no shell heredoc needed):
+```bash
+/Applications/PyMOL.app/Contents/bin/python -m pip install -e .
+```
+
+This installs the plugin into PyMOL's Python and puts the `pymol-claude` CLI in PyMOL's `bin/` directory (e.g. `/Applications/PyMOL.app/Contents/bin/pymol-claude`). On Linux/conda, replace the Python path with your PyMOL interpreter.
+
+`sudo` is usually unnecessary and best avoided.
+
+### 3. Tell PyMOL to start the plugin on launch
+
+Add this once to `~/.pymolrc.py`:
 
 ```python
-from pathlib import Path
-import sys
-
-repo = Path("~/pymol-claude").expanduser()  # adjust if you cloned elsewhere
-if str(repo) not in sys.path:
-    sys.path.insert(0, str(repo))
-
 from pymol_claude import __init_plugin__
 __init_plugin__()
 ```
 
-This runs directly from your clone, so you can pull changes and restart PyMOL without reinstalling.
+Restart PyMOL. The console should print `MCP server running on http://127.0.0.1:8766/sse`.
 
-### 3. Optional: install into PyMOL's Python
+### 4. Connect your MCP client (one-time, global)
 
-If you prefer an installed package instead of importing from the clone:
+Goal: set this up once so the `pymol` tools are available in every Cursor / Claude Code window, in any directory. You shouldn't have to `cd` into this repo to use the tool.
+
+#### Cursor
 
 ```bash
-/Applications/PyMOL.app/Contents/bin/python -m pip install --user -e .
+/Applications/PyMOL.app/Contents/bin/pymol-claude install-config
 ```
 
-On Linux/conda installs, replace the Python path with your PyMOL interpreter.
+This writes `~/.cursor/mcp.json` (merging with any existing entries — your other MCP servers are preserved). Restart Cursor; verify under Settings → Cursor Settings → MCP that `pymol` is listed.
 
-`sudo` is usually unnecessary and best avoided. Use it only if you intentionally want a system-wide install and understand the permission implications.
-
-### 4. Connect an MCP client
+If `pymol-claude` isn't on your `$PATH`, either use the absolute path above or add `/Applications/PyMOL.app/Contents/bin` to your PATH.
 
 #### Claude Code
 
@@ -49,32 +52,30 @@ On Linux/conda installs, replace the Python path with your PyMOL interpreter.
 claude mcp add --transport sse --scope user pymol http://localhost:8766/sse
 ```
 
-That's it. This works globally — you can run `claude` from any directory.
+Works from any directory. Same effect: every Claude Code session sees the `pymol` server.
 
-#### Cursor
+#### Don't want to install with pip?
 
-Recent Cursor releases support SSE/HTTP MCP servers. Add this in either:
-- `~/.cursor/mcp.json` (global), or
-- `.cursor/mcp.json` in your project
+You can run the plugin directly from the clone by using `sys.path` injection in `~/.pymolrc.py`:
 
-```json
-{
-  "mcpServers": {
-    "pymol": {
-      "url": "http://localhost:8766/sse"
-    }
-  }
-}
+```python
+import sys
+sys.path.insert(0, "/path/to/pymol-claude")
+from pymol_claude import __init_plugin__
+__init_plugin__()
 ```
 
-Then:
-- Restart Cursor
-- Go to Settings -> Cursor Settings -> MCP
-- Make sure PyMOL is already running (PyMOL hosts the MCP server)
-- Confirm `pymol` is listed and tools are visible (`run`, `render`, `load_directory`, etc.)
-- If tools do not appear, check the MCP panel error and run `curl http://localhost:8766/sse` to confirm the server is reachable
+In that case run `python -m pymol_claude.cli install-config` from inside the clone instead of the absolute-path command above.
 
-This repo also includes `.mcp.json` with the same server URL block.
+#### Project-scoped config
+
+If you specifically want the `pymol` server enabled only inside one project (rather than globally), use:
+
+```bash
+pymol-claude install-config --project --project-dir /path/to/project
+```
+
+This writes `<project>/.cursor/mcp.json`. Cursor merges project and global configs; project-level entries override the global `pymol` entry inside that workspace, which is occasionally what you want (e.g. point at a different port for that project) and otherwise should be avoided to prevent surprises.
 
 ## Usage
 
