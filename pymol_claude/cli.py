@@ -1,6 +1,7 @@
 """CLI for pymol-claude setup and diagnostics.
 
 Subcommands:
+    install-hook       Append the plugin startup line to ~/.pymolrc.py
     install-config     Write Cursor MCP config (global by default)
 
 The CLI is pure stdlib — it does not import pymol or fastmcp — so it can run
@@ -69,6 +70,43 @@ def write_mcp_config(path: Path, port: int) -> str:
     return f"{action} {path} -> pymol @ {desired_url}"
 
 
+PYMOLRC_SENTINEL = "# pymol-claude: auto-start MCP server on PyMOL launch"
+PYMOLRC_LINE = "from pymol_claude import __init_plugin__; __init_plugin__()"
+
+
+def write_pymolrc_hook(path: Path) -> str:
+    """Append the plugin startup line to ~/.pymolrc.py if not already present.
+
+    Returns a human-readable status message. Raises on I/O errors.
+    """
+    existing = path.read_text() if path.exists() else ""
+
+    if PYMOLRC_LINE in existing:
+        return f"Already configured: {path}"
+
+    snippet_parts: list[str] = []
+    if existing and not existing.endswith("\n"):
+        snippet_parts.append("\n")
+    if existing:
+        snippet_parts.append("\n")
+    snippet_parts.append(f"{PYMOLRC_SENTINEL}\n{PYMOLRC_LINE}\n")
+    snippet = "".join(snippet_parts)
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a") as f:
+        f.write(snippet)
+
+    action = "Appended to" if existing else "Wrote"
+    return f"{action} {path}. Restart PyMOL to load the plugin."
+
+
+def cmd_install_hook(args: argparse.Namespace) -> int:
+    target = Path.home() / ".pymolrc.py"
+    msg = write_pymolrc_hook(target)
+    print(msg)
+    return 0
+
+
 def cmd_install_config(args: argparse.Namespace) -> int:
     if args.project:
         target = Path(args.project_dir).resolve() / ".cursor" / "mcp.json"
@@ -90,6 +128,17 @@ def build_parser() -> argparse.ArgumentParser:
         description="pymol-claude setup and diagnostics",
     )
     sub = parser.add_subparsers(dest="cmd", required=True)
+
+    p_hook = sub.add_parser(
+        "install-hook",
+        help="Append plugin startup line to ~/.pymolrc.py so PyMOL loads it on launch",
+        description=(
+            "Append a one-liner to ~/.pymolrc.py that starts the MCP server when "
+            "PyMOL launches. Safe to re-run — does nothing if the line is already "
+            "present."
+        ),
+    )
+    p_hook.set_defaults(func=cmd_install_hook)
 
     p_install = sub.add_parser(
         "install-config",
