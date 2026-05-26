@@ -6,24 +6,18 @@ Exposes PyMOL's Python API as an MCP server so any MCP client
 
 from __future__ import annotations
 
-import sys
 import threading
-from pathlib import Path
 
 from pymol_claude.config import DEFAULT_HOST, DEFAULT_PORT
-
-# Ensure the pymol_claude package is importable even when loaded as a PyMOL
-# startup plugin from the app bundle. The src/ dir (parent of pymol_claude/)
-# must be on sys.path so that "from pymol_claude.server import ..." works.
-src_dir = str(Path(__file__).resolve().parent.parent)
-if src_dir not in sys.path:
-    sys.path.insert(0, src_dir)
 
 server_thread: threading.Thread | None = None
 
 
 def __init_plugin__(app=None):
     """Called by PyMOL's plugin system on startup."""
+    from pymol import cmd
+
+    cmd.extend("start_mcp", start_mcp)
     start_mcp()
 
 
@@ -60,13 +54,3 @@ def start_mcp(port: int = DEFAULT_PORT):
     server_thread.start()
 
     print(f"pymol-claude: MCP server running on http://{DEFAULT_HOST}:{port}/sse")
-
-
-# Register PyMOL commands
-try:
-    from pymol import cmd
-
-    cmd.extend("start_mcp", start_mcp)
-except ImportError:
-    # Not running inside PyMOL (e.g., during pip install)
-    pass
