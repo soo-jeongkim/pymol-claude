@@ -7,10 +7,10 @@ from pathlib import Path
 import gemmi
 from fastmcp import FastMCP
 
-from pymol_claude.core.pymol_helpers import ensure_pymol, pymol_lock
+from pymol_claude.core.metrics import StructureRecord
+from pymol_claude.core.metrics import find_low_confidence as find_low
 from pymol_claude.core.session import AppSession
-from pymol_claude.metrics import StructureRecord
-from pymol_claude.metrics import find_low_confidence as find_low
+from pymol_claude.utils.pymol_helpers import ensure_pymol, pymol_lock
 
 
 def register_metrics_tools(mcp: FastMCP, session: AppSession) -> None:

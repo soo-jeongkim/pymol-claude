@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from pymol_claude.config import STRUCTURE_EXTENSIONS
-from pymol_claude.metrics import StructureRecord, extract_record
+from pymol_claude.core.metrics import StructureRecord, extract_record
 
 
 @dataclass

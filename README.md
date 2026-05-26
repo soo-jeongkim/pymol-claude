@@ -1,6 +1,6 @@
 # pymol-claude
 
-**Active WIP** — works for personal use; tests cover metrics parsing only (no PyMOL in CI).
+**Active WIP** — works for personal use.
 
 tldr - PyMOL plugin that turns PyMOL into an MCP server. Drive PyMOL from Claude Code, Cursor, or any MCP client.
 

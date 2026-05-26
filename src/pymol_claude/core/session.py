@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from pymol_claude.metrics import StructureRecord, extract_record
-from pymol_claude.triage import TriageState
+from pymol_claude.core.metrics import StructureRecord, extract_record
+from pymol_claude.core.triage import TriageState
 
 
 class MetricsRegistry:

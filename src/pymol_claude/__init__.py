@@ -13,11 +13,11 @@ from pathlib import Path
 from pymol_claude.config import DEFAULT_HOST, DEFAULT_PORT
 
 # Ensure the pymol_claude package is importable even when loaded as a PyMOL
-# startup plugin from the app bundle. The project root (parent of pymol_claude/)
-# must be on sys.path so that "from pymol_claude.mcp_server import ..." works.
-project_root = str(Path(__file__).resolve().parent.parent)
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
+# startup plugin from the app bundle. The src/ dir (parent of pymol_claude/)
+# must be on sys.path so that "from pymol_claude.server import ..." works.
+src_dir = str(Path(__file__).resolve().parent.parent)
+if src_dir not in sys.path:
+    sys.path.insert(0, src_dir)
 
 server_thread: threading.Thread | None = None
 
@@ -42,7 +42,7 @@ def start_mcp(port: int = DEFAULT_PORT):
 
     os.environ["FASTMCP_LOG_LEVEL"] = "WARNING"
 
-    from pymol_claude.mcp_server import create_server
+    from pymol_claude.server import create_server
 
     server = create_server()
     port = int(port)

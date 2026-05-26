@@ -6,10 +6,10 @@ from fastmcp import FastMCP
 
 from pymol_claude.core.session import AppSession
 from pymol_claude.instructions import MCP_INSTRUCTIONS
-from pymol_claude.tools.metrics_tools import register_metrics_tools
+from pymol_claude.tools.metrics import register_metrics_tools
 from pymol_claude.tools.render import register_render_tools
 from pymol_claude.tools.run import register_run_tool
-from pymol_claude.tools.triage_tools import register_triage_tools
+from pymol_claude.tools.triage import register_triage_tools
 
 
 def create_server() -> FastMCP:

@@ -19,6 +19,9 @@ from pathlib import Path
 
 from pymol_claude.config import DEFAULT_PORT
 
+PYMOLRC_SENTINEL = "# pymol-claude: auto-start MCP server on PyMOL launch"
+PYMOLRC_LINE = "from pymol_claude import __init_plugin__; __init_plugin__()"
+
 
 def server_url(port: int) -> str:
     return f"http://localhost:{port}/sse"
@@ -68,10 +71,6 @@ def write_mcp_config(path: Path, port: int) -> str:
 
     action = "Updated" if existing is not None else "Wrote"
     return f"{action} {path} -> pymol @ {desired_url}"
-
-
-PYMOLRC_SENTINEL = "# pymol-claude: auto-start MCP server on PyMOL launch"
-PYMOLRC_LINE = "from pymol_claude import __init_plugin__; __init_plugin__()"
 
 
 def write_pymolrc_hook(path: Path) -> str:

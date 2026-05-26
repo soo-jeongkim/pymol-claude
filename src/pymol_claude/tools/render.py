@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastmcp import FastMCP
 from fastmcp.utilities.types import Image
 
-from pymol_claude.core.pymol_helpers import (
+from pymol_claude.utils.pymol_helpers import (
     apply_plddt_palette,
     ensure_pymol,
     pymol_lock,

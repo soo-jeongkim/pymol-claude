@@ -7,7 +7,7 @@ from contextlib import redirect_stdout
 
 from fastmcp import FastMCP
 
-from pymol_claude.core.pymol_helpers import ensure_pymol, pymol_lock
+from pymol_claude.utils.pymol_helpers import ensure_pymol, pymol_lock
 
 # Restricted builtins for run() — enough for PyMOL scripting, not general Python.
 # No imports, open(), exec(), eval(), etc. Full PyMOL access remains via `cmd`.
@@ -42,7 +42,9 @@ def register_run_tool(mcp: FastMCP) -> None:
         """Execute Python code with restricted builtins.
 
         `cmd` is the PyMOL command module; use `cmd.do(...)` for PyMOL CLI syntax.
-        Output from print() is returned.
+        Output from print() is returned. Examples:
+            run("cmd.load('foo.cif')")
+            run("cmd.show('cartoon'); cmd.color('salmon', 'chain A')")
 
         Security: runs locally on your machine with no imports or file I/O builtins,
         but full PyMOL access via `cmd`. Only connect trusted MCP clients.
