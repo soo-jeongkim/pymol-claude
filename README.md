@@ -83,6 +83,41 @@ Works from any directory. `claude mcp list` should show `pymol`.
 
 Once correct plumbing is verified, you need to open PyMOL first then a new Cursor window/Claude Code session.
 
+## Uninstall
+
+Reverses the Install steps. There's no `uninstall` subcommand, so the config edits are manual — they're one line each.
+
+### 1. Unwire your MCP client
+
+**Cursor:** edit `~/.cursor/mcp.json` and delete the `"pymol"` entry under `mcpServers` (leave any other servers intact). Quit Cursor (`Cmd+Q`) and reopen.
+
+**Claude Code:**
+
+```bash
+claude mcp remove pymol --scope user
+```
+
+### 2. Remove the PyMOL startup hook
+
+Delete these two lines from `~/.pymolrc.py`:
+
+```python
+# pymol-claude: auto-start MCP server on PyMOL launch
+from pymol_claude import __init_plugin__; __init_plugin__()
+```
+
+If that was the only thing in the file, you can delete `~/.pymolrc.py` entirely.
+
+### 3. Uninstall the package
+
+```bash
+/Applications/PyMOL.app/Contents/bin/python -m pip uninstall pymol-claude
+```
+
+### 4. Restart PyMOL
+
+A full quit + relaunch. The `MCP server running on...` line should be gone. The plugin keeps no caches or logs of its own, so nothing else is left behind. (The cloned repo is yours to `rm -rf` whenever.)
+
 ## Usage
 
 1. Open PyMOL (the MCP server auto-starts).
