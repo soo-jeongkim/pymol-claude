@@ -17,9 +17,10 @@ def register_triage_tools(mcp: FastMCP, session: AppSession) -> None:
         Sets up triage navigation.
         """
         cmd = ensure_pymol()
-        msg = session.triage.load_directory(path)
-        if not session.triage.files:
-            return msg if msg.startswith("Error:") else f"Error: {msg}"
+        try:
+            msg = session.triage.load_directory(path)
+        except OSError as e:
+            return f"Error: {e}"
         session.sync_metrics_from_triage()
         with pymol_lock:
             cmd.delete("all")
@@ -40,24 +41,18 @@ def register_triage_tools(mcp: FastMCP, session: AppSession) -> None:
     @mcp.tool()
     def next_structure() -> Image | str:
         """Advance to next structure, load it, color by pLDDT, and render."""
-        if not session.triage.active_indices:
-            return "Error: No structures loaded. Use load_directory first."
         session.triage.next()
         return _render_current()
 
     @mcp.tool()
     def prev_structure() -> Image | str:
         """Go back to previous structure, load it, color by pLDDT, and render."""
-        if not session.triage.active_indices:
-            return "Error: No structures loaded. Use load_directory first."
         session.triage.prev()
         return _render_current()
 
     @mcp.tool()
     def go_to(number: int) -> Image | str:
         """Jump to Nth structure (1-indexed), load it, and render."""
-        if not session.triage.active_indices:
-            return "Error: No structures loaded. Use load_directory first."
         session.triage.go_to(number)
         return _render_current()
 

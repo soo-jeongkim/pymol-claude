@@ -10,6 +10,11 @@ from pymol_claude.config import STRUCTURE_EXTENSIONS
 from pymol_claude.core.metrics import StructureRecord, extract_record
 
 
+def plddt_label(mean_plddt: float | None) -> str:
+    """Short 'pLDDT=NN.N' label, or 'no pLDDT' when unscored."""
+    return f"pLDDT={mean_plddt:.1f}" if mean_plddt is not None else "no pLDDT"
+
+
 @dataclass
 class TriageState:
     files: list[Path] = field(default_factory=list)
@@ -39,10 +44,13 @@ class TriageState:
         return len(self.active_indices)
 
     def load_directory(self, path: str | Path) -> str:
-        """Scan directory for structure files and extract metrics."""
+        """Scan directory for structure files and extract metrics.
+
+        Raises NotADirectoryError / FileNotFoundError on bad input.
+        """
         path = Path(path)
         if not path.is_dir():
-            return f"Error: {path} is not a directory"
+            raise NotADirectoryError(f"{path} is not a directory")
 
         found = sorted(
             f
@@ -51,7 +59,7 @@ class TriageState:
         )
 
         if not found:
-            return f"Error: No structure files found in {path}"
+            raise FileNotFoundError(f"No structure files found in {path}")
 
         self.files = found
         self.records = {}
@@ -69,9 +77,7 @@ class TriageState:
 
         lines = [f"Loaded {len(found)} structures from {path.name}/"]
         for r in sorted_records[:10]:
-            plddt_str = (
-                f"pLDDT={r.mean_plddt:.1f}" if r.mean_plddt is not None else "no pLDDT"
-            )
+            plddt_str = plddt_label(r.mean_plddt)
             iptm_str = f", ipTM={r.iptm:.3f}" if r.iptm is not None else ""
             lines.append(f"  {r.name}: {plddt_str}{iptm_str}")
         if len(found) > 10:
@@ -139,11 +145,7 @@ class TriageState:
 
         lines = [f"{len(self.flags)} flagged structures:"]
         for i, f in enumerate(self.flags, 1):
-            plddt_str = (
-                f"pLDDT={f['mean_plddt']:.1f}"
-                if f["mean_plddt"] is not None
-                else "no pLDDT"
-            )
+            plddt_str = plddt_label(f["mean_plddt"])
             note_str = f" — {f['note']}" if f["note"] else ""
             lines.append(f"  {i}. {f['name']} ({plddt_str}){note_str}")
         return "\n".join(lines)

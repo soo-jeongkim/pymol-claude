@@ -60,6 +60,4 @@ class AppSession:
         if record is not None:
             self.metrics.register(obj_name, record)
             return record
-        if path:
-            return self.metrics.register_from_path(obj_name, Path(path).expanduser())
         return None
