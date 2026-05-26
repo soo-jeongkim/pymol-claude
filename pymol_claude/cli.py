@@ -14,10 +14,10 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Sequence
 
-DEFAULT_PORT = 8766
+from pymol_claude.config import DEFAULT_PORT
 
 
 def server_url(port: int) -> str:

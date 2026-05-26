@@ -1,5 +1,7 @@
 # pymol-claude
 
+**Active WIP** — works for personal use; tests cover metrics parsing only (no PyMOL in CI).
+
 tldr - PyMOL plugin that turns PyMOL into an MCP server. Drive PyMOL from Claude Code, Cursor, or any MCP client.
 
 ## What it is
@@ -90,3 +92,9 @@ Once correct plumbing is verified, you need to open PyMOL first then a new Curso
    - "Color by pLDDT, then render a ray-traced PNG"
    - "Align model_0 onto model_1; what's the RMSD?"
    - "Look at `~/scripts/my_pymol_helpers.py` — apply the publication-style view to all objects"
+
+## Notes
+
+- **`get_metrics` and `path`:** Structures loaded via `load_directory` have metrics automatically. If you load with `run("cmd.load('foo.cif')")`, pass `path` to `get_metrics` or `find_low_confidence`.
+- **`run()` security:** Executes locally with restricted Python builtins (no imports/file I/O), but full PyMOL access via `cmd`. Only connect trusted MCP clients.
+- **Dev setup (optional):** `pip install -e ".[dev]" && pytest`. Pre-commit hooks are available but not required — see `.pre-commit-config.yaml`.

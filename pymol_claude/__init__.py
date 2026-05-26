@@ -9,7 +9,8 @@ from __future__ import annotations
 import sys
 import threading
 from pathlib import Path
-from typing import Optional
+
+from pymol_claude.config import DEFAULT_HOST, DEFAULT_PORT
 
 # Ensure the pymol_claude package is importable even when loaded as a PyMOL
 # startup plugin from the app bundle. The project root (parent of pymol_claude/)
@@ -18,7 +19,7 @@ project_root = str(Path(__file__).resolve().parent.parent)
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-server_thread: Optional[threading.Thread] = None
+server_thread: threading.Thread | None = None
 
 
 def __init_plugin__(app=None):
@@ -26,7 +27,7 @@ def __init_plugin__(app=None):
     start_mcp()
 
 
-def start_mcp(port: int = 8766):
+def start_mcp(port: int = DEFAULT_PORT):
     """Start the MCP server in a background thread.
 
     Can be called from PyMOL command line: start_mcp [port]
@@ -50,7 +51,7 @@ def start_mcp(port: int = 8766):
         target=server.run,
         kwargs={
             "transport": "sse",
-            "host": "127.0.0.1",
+            "host": DEFAULT_HOST,
             "port": port,
             "log_level": "warning",
         },
@@ -58,23 +59,7 @@ def start_mcp(port: int = 8766):
     )
     server_thread.start()
 
-    print(f"pymol-claude: MCP server running on http://127.0.0.1:{port}/sse")
-
-
-def stop_mcp():
-    """Stop the MCP server.
-
-    Note: daemon thread will die when PyMOL exits. This just clears the reference.
-    """
-    global server_thread
-    if server_thread is None or not server_thread.is_alive():
-        print("pymol-claude: MCP server is not running")
-        return
-
-    # Daemon threads can't be cleanly stopped; they die with the process.
-    # Clear the reference so start_mcp can be called again.
-    server_thread = None
-    print("pymol-claude: Server reference cleared (thread will stop on PyMOL exit)")
+    print(f"pymol-claude: MCP server running on http://{DEFAULT_HOST}:{port}/sse")
 
 
 # Register PyMOL commands
@@ -82,7 +67,6 @@ try:
     from pymol import cmd
 
     cmd.extend("start_mcp", start_mcp)
-    cmd.extend("stop_mcp", stop_mcp)
 except ImportError:
     # Not running inside PyMOL (e.g., during pip install)
     pass
